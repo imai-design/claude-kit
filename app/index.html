@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Claude Kit</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <main class="app">
+      <section id="screen-welcome" class="screen active">
+        <div class="hero">
+          <div class="hero-icon">🚀</div>
+          <h1>Claude Kit へようこそ</h1>
+          <p class="lead">
+            Claudeを使い始めるのに必要な道具を、まとめてインストールします。
+          </p>
+          <ul class="bullet">
+            <li>🌿 <b>Git</b> — コードのバージョン管理</li>
+            <li>📝 <b>Visual Studio Code</b> — エディタ</li>
+            <li>🤖 <b>Claude</b> — デスクトップアプリ</li>
+            <li>⌨️ <b>Claude Code</b> — ターミナル版Claude</li>
+          </ul>
+          <button id="btn-start" class="btn-primary">はじめる</button>
+          <p class="note">所要時間 5〜10分／途中でパスワード入力を求められることがあります</p>
+        </div>
+      </section>
+
+      <section id="screen-checking" class="screen">
+        <h2>あなたのパソコンに何が入っているか確認します</h2>
+        <div id="tool-list" class="tool-list"></div>
+        <div class="row">
+          <button id="btn-back-1" class="btn-secondary">戻る</button>
+          <button id="btn-install" class="btn-primary" disabled>確認中…</button>
+        </div>
+      </section>
+
+      <section id="screen-installing" class="screen">
+        <h2>インストールしています</h2>
+        <div id="install-tool-list" class="tool-list"></div>
+        <p class="note">途中でパスワード入力が求められたら、パソコンのログインパスワードを入れてください<br/>Gitのインストールでは、別ウィンドウのAppleのダイアログで「インストール」をクリックしてください</p>
+      </section>
+
+      <section id="screen-done" class="screen">
+        <div class="hero">
+          <div class="hero-icon">🎉</div>
+          <h1>セットアップ完了！</h1>
+          <p class="lead">これで Claude を使う準備ができました。</p>
+          <h3>次にやること</h3>
+          <ol class="bullet">
+            <li>Claude アプリを起動してログイン</li>
+            <li>VS Code を起動してみる</li>
+            <li>ターミナルで <code>claude</code> と打つ</li>
+          </ol>
+          <div id="error-summary" class="error-summary"></div>
+          <button id="btn-finish" class="btn-primary">閉じる</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

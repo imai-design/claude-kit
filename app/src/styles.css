@@ -1,0 +1,161 @@
+:root {
+  --bg: #f8f7f4;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --primary: #d97757;
+  --primary-hover: #c1664a;
+  --border: #e5e3df;
+  --success: #2ea043;
+  --warn: #d97706;
+  --error: #d92d20;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
+  font-size: 15px;
+  color: var(--text);
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+html, body, .app { height: 100%; background: var(--bg); }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  padding: 28px 36px;
+}
+
+.screen { display: none; flex: 1; flex-direction: column; }
+.screen.active { display: flex; }
+
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+h2 { font-size: 18px; font-weight: 600; margin-bottom: 14px; }
+h3 { font-size: 15px; font-weight: 600; margin: 16px 0 8px; }
+
+.hero {
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+.hero-icon { font-size: 56px; margin-bottom: 8px; }
+.lead { font-size: 15px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+
+.bullet { list-style: none; padding: 0; margin: 0 0 24px; text-align: left; align-self: stretch; }
+.bullet li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.bullet li:last-child { border-bottom: none; }
+
+.note { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+
+.btn-primary, .btn-secondary {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.btn-primary { background: var(--primary); color: white; box-shadow: var(--shadow); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
+.btn-primary:disabled { background: #d4cfc9; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--surface); }
+
+.row { display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; }
+
+code {
+  background: var(--surface);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "SF Mono", Monaco, Consolas, monospace;
+  font-size: 13px;
+}
+
+.tool-list { display: flex; flex-direction: column; gap: 10px; flex: 1; margin: 12px 0; overflow-y: auto; }
+.tool {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.tool-icon { font-size: 26px; width: 36px; text-align: center; }
+.tool-meta { flex: 1; min-width: 0; }
+.tool-name { font-weight: 600; font-size: 14px; }
+.tool-desc {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-progress {
+  height: 4px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.mini-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge.checking { background: #f0eee9; color: var(--muted); }
+.badge.installed { background: #e6f4ea; color: var(--success); }
+.badge.missing { background: #fef3c7; color: var(--warn); }
+.badge.installing { background: #fef3c7; color: var(--warn); }
+.badge.done { background: #e6f4ea; color: var(--success); }
+.badge.error { background: #fee2e2; color: var(--error); }
+
+.error-summary {
+  align-self: stretch;
+  text-align: left;
+  margin: 16px 0;
+}
+.error-box {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.error-title {
+  font-weight: 600;
+  color: var(--error);
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.error-box ul { padding-left: 18px; font-size: 12px; color: #7f1d1d; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1815;
+    --surface: #26221e;
+    --text: #f5f3ef;
+    --muted: #a8a39c;
+    --border: #3a3530;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  .badge.checking { background: #3a3530; color: var(--muted); }
+  .error-box { background: #2a1a1a; border-color: #5a2a2a; }
+  .error-box ul { color: #fecaca; }
+}

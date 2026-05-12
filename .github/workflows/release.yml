@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target universal-apple-darwin"
+            rust-targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+          - platform: "windows-latest"
+            args: ""
+            rust-targets: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./app/src-tauri -> target"
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: bun install
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: app
+          tagName: ${{ github.ref_name }}
+          releaseName: "Claude Kit ${{ github.ref_name }}"
+          releaseBody: |
+            ## インストール手順
+
+            ### Mac (Apple Silicon / Intel どちらも対応)
+            1. `Claude Kit_*.dmg` をダウンロード
+            2. 開いて `Claude Kit.app` を `/Applications` フォルダにドラッグ
+            3. 初回起動: **Finderで右クリック → 「開く」** → ダイアログで「開く」(未署名のため必須)
+
+            ### Windows
+            1. `Claude Kit_*_x64-setup.exe` または `.msi` をダウンロード
+            2. ダブルクリック
+            3. 「WindowsによってPCが保護されました」画面が出たら **「詳細情報」 → 「実行」**
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
