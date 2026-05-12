@@ -9,9 +9,10 @@ use tauri::{AppHandle, Emitter};
 #[cfg(target_os = "macos")]
 const VSCODE_MACOS_URL: &str = "https://update.code.visualstudio.com/latest/darwin-universal/stable";
 #[cfg(target_os = "macos")]
-const CLAUDE_DESKTOP_MACOS_URL: &str = "https://desktop.anthropic.com/mac/Claude.dmg";
-#[cfg(target_os = "macos")]
 const CLAUDE_CODE_UNIX_INSTALLER: &str = "https://claude.ai/install.sh";
+/// Mac App Store URL scheme — opens the App Store app directly to the Claude page.
+#[cfg(target_os = "macos")]
+const CLAUDE_DESKTOP_MAS_URL: &str = "macappstore://apps.apple.com/app/id6473753684";
 
 #[derive(Clone, Serialize)]
 struct InstallProgress {
@@ -306,56 +307,35 @@ async fn install_vscode_macos(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Open Mac App Store directly to the Claude page. The user clicks "入手" once;
+/// the App Store handles the rest. This sidesteps Anthropic's auth-protected DMG
+/// redirect endpoint and avoids Gatekeeper friction on unsigned binaries.
 #[cfg(target_os = "macos")]
 async fn install_claude_desktop_macos(app: &AppHandle) -> Result<(), String> {
-    let dmg =
-        download_with_progress(app, "claude_desktop", CLAUDE_DESKTOP_MACOS_URL, "claude.dmg")
-            .await?;
-    emit_progress(app, "claude_desktop", "extracting", 85, "DMG をマウント中...");
-    let mount_output = Command::new("hdiutil")
-        .args(["attach", "-nobrowse", "-noverify"])
-        .arg(&dmg)
-        .output()
-        .map_err(|e| format!("hdiutil 実行失敗: {}", e))?;
-    if !mount_output.status.success() {
-        let _ = std::fs::remove_file(&dmg);
-        return Err(format!(
-            "DMG のマウントに失敗: {}",
-            String::from_utf8_lossy(&mount_output.stderr)
-        ));
+    emit_progress(
+        app,
+        "claude_desktop",
+        "installing",
+        50,
+        "Mac App Store を開きます...",
+    );
+    let status = Command::new("open")
+        .arg(CLAUDE_DESKTOP_MAS_URL)
+        .status()
+        .map_err(|e| format!("App Store を開けませんでした: {}", e))?;
+    if !status.success() {
+        return Err("App Store の起動に失敗しました".to_string());
     }
-    let mount_text = String::from_utf8_lossy(&mount_output.stdout);
-    let mount_point = mount_text
-        .lines()
-        .filter_map(|line| line.split('\t').last())
-        .map(|s| s.trim())
-        .find(|s| s.starts_with("/Volumes/"))
-        .map(|s| s.to_string())
-        .ok_or_else(|| "マウントポイントが見つかりません".to_string())?;
-
-    emit_progress(app, "claude_desktop", "extracting", 92, "Claude.app をコピー中...");
-    let src = format!("{}/Claude.app", mount_point);
-    let _ = Command::new("rm").arg("-rf").arg("/Applications/Claude.app").output();
-    let copy_status = Command::new("cp")
-        .args(["-R", &src, "/Applications/"])
-        .status();
-    let _ = Command::new("hdiutil")
-        .args(["detach", "-quiet"])
-        .arg(&mount_point)
-        .output();
-    let _ = std::fs::remove_file(&dmg);
-
-    match copy_status {
-        Ok(s) if s.success() => {
-            let _ = Command::new("xattr")
-                .args(["-dr", "com.apple.quarantine", "/Applications/Claude.app"])
-                .output();
-            emit_progress(app, "claude_desktop", "done", 100, "完了");
-            Ok(())
-        }
-        Ok(_) => Err("Claude.app のコピーに失敗しました".to_string()),
-        Err(e) => Err(format!("cp 実行失敗: {}", e)),
-    }
+    // We can't tell from here whether the user actually clicked "Get". Treat as success
+    // — the App Store window is now in front, user takes the next click.
+    emit_progress(
+        app,
+        "claude_desktop",
+        "done",
+        100,
+        "App Store で「入手」をクリックしてください",
+    );
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
@@ -380,27 +360,38 @@ async fn install_claude_code_unix(app: &AppHandle) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 async fn install_windows(app: &AppHandle, id: &str) -> Result<(), String> {
     match id {
-        "git" => winget_install(app, "git", "Git.Git").await,
-        "vscode" => winget_install(app, "vscode", "Microsoft.VisualStudioCode").await,
-        "claude_desktop" => winget_install(app, "claude_desktop", "Anthropic.Claude").await,
+        "git" => winget_install(app, "git", "Git.Git", None).await,
+        "vscode" => winget_install(app, "vscode", "Microsoft.VisualStudioCode", None).await,
+        "claude_desktop" => install_claude_desktop_windows(app).await,
         "claude_code" => install_claude_code_windows(app).await,
         _ => Err(format!("不明なツール: {}", id)),
     }
 }
 
+/// Run `winget install` for a package, optionally pinning scope (user/machine).
 #[cfg(target_os = "windows")]
-async fn winget_install(app: &AppHandle, tool: &str, package_id: &str) -> Result<(), String> {
+async fn winget_install(
+    app: &AppHandle,
+    tool: &str,
+    package_id: &str,
+    scope: Option<&str>,
+) -> Result<(), String> {
     emit_progress(app, tool, "installing", 30, "winget でインストール中...");
+    let mut args: Vec<String> = vec![
+        "install".into(),
+        "--id".into(),
+        package_id.into(),
+        "-e".into(),
+        "--accept-source-agreements".into(),
+        "--accept-package-agreements".into(),
+        "--silent".into(),
+    ];
+    if let Some(s) = scope {
+        args.push("--scope".into());
+        args.push(s.into());
+    }
     let output = Command::new("winget")
-        .args([
-            "install",
-            "--id",
-            package_id,
-            "-e",
-            "--accept-source-agreements",
-            "--accept-package-agreements",
-            "--silent",
-        ])
+        .args(&args)
         .output()
         .map_err(|e| format!("winget 実行失敗: {}", e))?;
     if !output.status.success() {
@@ -412,6 +403,159 @@ async fn winget_install(app: &AppHandle, tool: &str, package_id: &str) -> Result
     }
     emit_progress(app, tool, "done", 100, "完了");
     Ok(())
+}
+
+/// Two-tier strategy: (1) direct download of the EXE from the URL listed in the
+/// winget-pkgs manifest, executed silently. (2) Fallback to winget with --scope user,
+/// which forces the user-scope EXE installer instead of the MSIX (which often fails
+/// without proper sideloading/admin context).
+#[cfg(target_os = "windows")]
+async fn install_claude_desktop_windows(app: &AppHandle) -> Result<(), String> {
+    // Tier 1: direct download with manifest discovery.
+    match try_direct_install_claude_desktop_windows(app).await {
+        Ok(()) => return Ok(()),
+        Err(e) => {
+            emit_progress(
+                app,
+                "claude_desktop",
+                "installing",
+                15,
+                &format!("直接DL失敗 ({}) → winget へ切替", e),
+            );
+        }
+    }
+    // Tier 2: winget with explicit user scope.
+    winget_install(app, "claude_desktop", "Anthropic.Claude", Some("user")).await
+}
+
+#[cfg(target_os = "windows")]
+async fn try_direct_install_claude_desktop_windows(app: &AppHandle) -> Result<(), String> {
+    emit_progress(
+        app,
+        "claude_desktop",
+        "installing",
+        5,
+        "最新版のURLを取得中...",
+    );
+    let exe_url = fetch_winget_exe_installer_url("a", "Anthropic", "Claude").await?;
+
+    let exe = download_with_progress(app, "claude_desktop", &exe_url, "ClaudeSetup.exe").await?;
+
+    emit_progress(
+        app,
+        "claude_desktop",
+        "installing",
+        92,
+        "インストーラを実行中 (--silent)...",
+    );
+    let status = Command::new(&exe)
+        .arg("--silent")
+        .status()
+        .map_err(|e| format!("EXE 実行失敗: {}", e))?;
+    let _ = std::fs::remove_file(&exe);
+    if !status.success() {
+        return Err(format!(
+            "インストーラがエラー終了: code={:?}",
+            status.code()
+        ));
+    }
+    emit_progress(app, "claude_desktop", "done", 100, "完了");
+    Ok(())
+}
+
+/// Resolve the latest winget-pkgs manifest entry whose InstallerType is "exe"
+/// and return its InstallerUrl. `letter`/`vendor`/`pkg` map to the manifests
+/// path layout (e.g. ("a", "Anthropic", "Claude") → manifests/a/Anthropic/Claude).
+#[cfg(target_os = "windows")]
+async fn fetch_winget_exe_installer_url(
+    letter: &str,
+    vendor: &str,
+    pkg: &str,
+) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("Claude-Kit-Installer")
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let dir_url = format!(
+        "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/{}/{}/{}",
+        letter, vendor, pkg
+    );
+    let entries: serde_json::Value = client
+        .get(&dir_url)
+        .header("Accept", "application/vnd.github.v3+json")
+        .send()
+        .await
+        .map_err(|e| format!("GitHub API失敗: {}", e))?
+        .json()
+        .await
+        .map_err(|e| format!("GitHub JSON失敗: {}", e))?;
+
+    let arr = entries
+        .as_array()
+        .ok_or_else(|| "GitHub API: array expected".to_string())?;
+    let latest = arr
+        .iter()
+        .filter_map(|e| e["name"].as_str())
+        .filter(|n| n.chars().next().map_or(false, |c| c.is_ascii_digit()))
+        .max_by(|a, b| compare_versions(a, b))
+        .ok_or_else(|| "No version found in manifests".to_string())?
+        .to_string();
+
+    let manifest_url = format!(
+        "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/{}/{}/{}/{}/{}.{}.installer.yaml",
+        letter, vendor, pkg, latest, vendor, pkg
+    );
+    let yaml = client
+        .get(&manifest_url)
+        .send()
+        .await
+        .map_err(|e| format!("manifest取得失敗: {}", e))?
+        .text()
+        .await
+        .map_err(|e| format!("manifest読込失敗: {}", e))?;
+
+    // The YAML has a flat "Installers:" list. For each installer block, capture
+    // (InstallerType, InstallerUrl). Return the first one whose type == "exe".
+    let mut cur_type: Option<String> = None;
+    let mut cur_url: Option<String> = None;
+    for line in yaml.lines() {
+        let trim = line.trim();
+        // New installer entry boundary.
+        let is_boundary = trim.starts_with("- Architecture:")
+            || trim.starts_with("- Platform:")
+            || trim == "-";
+        if is_boundary {
+            if let (Some(t), Some(u)) = (&cur_type, &cur_url) {
+                if t == "exe" {
+                    return Ok(u.clone());
+                }
+            }
+            cur_type = None;
+            cur_url = None;
+        }
+        if let Some(v) = trim.strip_prefix("InstallerType:") {
+            cur_type = Some(v.trim().to_string());
+        }
+        if let Some(v) = trim.strip_prefix("InstallerUrl:") {
+            cur_url = Some(v.trim().to_string());
+        }
+    }
+    if let (Some(t), Some(u)) = (cur_type, cur_url) {
+        if t == "exe" {
+            return Ok(u);
+        }
+    }
+    Err("EXE installer URL not found in manifest".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    let parse = |s: &str| -> Vec<u32> {
+        s.split('.').filter_map(|p| p.parse::<u32>().ok()).collect()
+    };
+    parse(a).cmp(&parse(b))
 }
 
 #[cfg(target_os = "windows")]
@@ -465,15 +609,16 @@ async fn download_with_progress(
     let total = resp.content_length().unwrap_or(0);
 
     use std::io::Write;
-    let mut file = std::fs::File::create(&dest)
-        .map_err(|e| format!("ファイル作成失敗: {}", e))?;
+    let mut file =
+        std::fs::File::create(&dest).map_err(|e| format!("ファイル作成失敗: {}", e))?;
     let mut downloaded: u64 = 0;
     let mut stream = resp.bytes_stream();
     let mut last_emit: u32 = 0;
 
     while let Some(chunk) = stream.next().await {
         let bytes = chunk.map_err(|e| format!("ダウンロードチャンク失敗: {}", e))?;
-        file.write_all(&bytes).map_err(|e| format!("書き込み失敗: {}", e))?;
+        file.write_all(&bytes)
+            .map_err(|e| format!("書き込み失敗: {}", e))?;
         downloaded += bytes.len() as u64;
         let pct = if total > 0 {
             ((downloaded as f64 / total as f64) * 80.0) as u32
