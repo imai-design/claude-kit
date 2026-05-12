@@ -180,9 +180,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-back-1")?.addEventListener("click", () => show("welcome"));
   document.getElementById("btn-install")?.addEventListener("click", () => void startInstall());
   document.getElementById("btn-finish")?.addEventListener("click", () => {
-    import("@tauri-apps/api/webviewWindow").then(({ getCurrentWebviewWindow }) => {
-      getCurrentWebviewWindow().close();
-    });
+    void invoke("quit_app");
   });
   show("welcome");
 });

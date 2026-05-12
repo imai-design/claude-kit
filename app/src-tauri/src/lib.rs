@@ -50,6 +50,11 @@ fn detect_tool(id: String) -> bool {
     }
 }
 
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 #[cfg(target_os = "macos")]
 fn detect_macos(id: &str) -> bool {
     match id {
@@ -75,31 +80,111 @@ fn detect_macos(id: &str) -> bool {
 #[cfg(target_os = "windows")]
 fn detect_windows(id: &str) -> bool {
     let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
+    let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
+    let app_data = std::env::var("APPDATA").unwrap_or_default();
     let program_files = std::env::var("ProgramFiles").unwrap_or_default();
     let program_files_x86 = std::env::var("ProgramFiles(x86)").unwrap_or_default();
+
+    let path_exists = |p: String| PathBuf::from(p).exists();
+
     match id {
         "git" => {
             which_bin("git.exe").is_some()
-                || PathBuf::from(format!("{}\\Git\\bin\\git.exe", program_files)).exists()
-                || PathBuf::from(format!("{}\\Git\\bin\\git.exe", program_files_x86)).exists()
+                || path_exists(format!("{}\\Git\\bin\\git.exe", program_files))
+                || path_exists(format!("{}\\Git\\cmd\\git.exe", program_files))
+                || path_exists(format!("{}\\Git\\bin\\git.exe", program_files_x86))
+                || path_exists(format!("{}\\Git\\cmd\\git.exe", program_files_x86))
+                || path_exists(format!(
+                    "{}\\scoop\\apps\\git\\current\\bin\\git.exe",
+                    user_profile
+                ))
+                || path_exists(format!("{}\\Programs\\Git\\bin\\git.exe", local_app_data))
+                || registry_display_name_contains("Git ")
         }
         "vscode" => {
             which_bin("code.cmd").is_some()
-                || PathBuf::from(format!(
+                || which_bin("code.exe").is_some()
+                || path_exists(format!(
                     "{}\\Programs\\Microsoft VS Code\\Code.exe",
                     local_app_data
                 ))
-                .exists()
-                || PathBuf::from(format!("{}\\Microsoft VS Code\\Code.exe", program_files)).exists()
+                || path_exists(format!("{}\\Microsoft VS Code\\Code.exe", program_files))
+                || path_exists(format!(
+                    "{}\\Microsoft VS Code\\Code.exe",
+                    program_files_x86
+                ))
+                || path_exists(format!(
+                    "{}\\scoop\\apps\\vscode\\current\\Code.exe",
+                    user_profile
+                ))
+                || registry_display_name_contains("Microsoft Visual Studio Code")
+                || registry_display_name_contains("Visual Studio Code")
         }
         "claude_desktop" => {
-            PathBuf::from(format!("{}\\AnthropicClaude\\Claude.exe", local_app_data)).exists()
-                || PathBuf::from(format!("{}\\Programs\\Claude\\Claude.exe", local_app_data))
-                    .exists()
+            path_exists(format!("{}\\AnthropicClaude\\Claude.exe", local_app_data))
+                || path_exists(format!("{}\\Programs\\Claude\\Claude.exe", local_app_data))
+                || path_exists(format!("{}\\Anthropic\\Claude\\Claude.exe", local_app_data))
+                || path_exists(format!("{}\\Claude\\Claude.exe", local_app_data))
+                || path_exists(format!("{}\\Claude\\Claude.exe", program_files))
+                || path_exists(format!("{}\\Anthropic\\Claude\\Claude.exe", program_files))
+                || registry_display_name_contains("Claude")
         }
-        "claude_code" => which_bin("claude.cmd").is_some() || which_bin("claude.exe").is_some(),
+        "claude_code" => {
+            which_bin("claude.cmd").is_some()
+                || which_bin("claude.exe").is_some()
+                || which_bin("claude").is_some()
+                || path_exists(format!("{}\\.local\\bin\\claude.exe", user_profile))
+                || path_exists(format!("{}\\.local\\bin\\claude.cmd", user_profile))
+                || path_exists(format!("{}\\.local\\bin\\claude", user_profile))
+                || path_exists(format!("{}\\.claude\\local\\claude.cmd", user_profile))
+                || path_exists(format!("{}\\.claude\\local\\claude.exe", user_profile))
+                || path_exists(format!("{}\\npm\\claude.cmd", app_data))
+                || path_exists(format!("{}\\npm\\claude.exe", app_data))
+        }
         _ => false,
     }
+}
+
+/// Scan Windows Uninstall registry hives for an app whose DisplayName contains the substring.
+/// Matches what "Add or Remove Programs" shows — authoritative source on Windows.
+#[cfg(target_os = "windows")]
+fn registry_display_name_contains(substring: &str) -> bool {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ};
+    use winreg::RegKey;
+
+    let needle = substring.to_lowercase();
+    let paths: [(winreg::HKEY, &str); 3] = [
+        (
+            HKEY_LOCAL_MACHINE,
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        ),
+        (
+            HKEY_LOCAL_MACHINE,
+            r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        ),
+        (
+            HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        ),
+    ];
+
+    for (hive, path) in paths {
+        let root = RegKey::predef(hive);
+        let Ok(key) = root.open_subkey_with_flags(path, KEY_READ) else {
+            continue;
+        };
+        for subkey_name in key.enum_keys().flatten() {
+            let Ok(subkey) = key.open_subkey_with_flags(&subkey_name, KEY_READ) else {
+                continue;
+            };
+            if let Ok(name) = subkey.get_value::<String, _>("DisplayName") {
+                if name.to_lowercase().contains(&needle) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 fn which_bin(bin: &str) -> Option<PathBuf> {
@@ -110,7 +195,11 @@ fn which_bin(bin: &str) -> Option<PathBuf> {
     }
     let s = String::from_utf8(output.stdout).ok()?;
     let first = s.lines().next()?.trim();
-    if first.is_empty() { None } else { Some(PathBuf::from(first)) }
+    if first.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(first))
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -207,7 +296,11 @@ async fn install_vscode_macos(app: &AppHandle) -> Result<(), String> {
     }
     let _ = std::fs::remove_file(&zip);
     let _ = Command::new("xattr")
-        .args(["-dr", "com.apple.quarantine", "/Applications/Visual Studio Code.app"])
+        .args([
+            "-dr",
+            "com.apple.quarantine",
+            "/Applications/Visual Studio Code.app",
+        ])
         .output();
     emit_progress(app, "vscode", "done", 100, "完了");
     Ok(())
@@ -406,7 +499,7 @@ async fn download_with_progress(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![detect_tool, install_tool])
+        .invoke_handler(tauri::generate_handler![detect_tool, install_tool, quit_app])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
