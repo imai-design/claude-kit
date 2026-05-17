@@ -134,6 +134,9 @@ function renderToolPicker() {
       const s = getState(t.id);
       const checked = s.selected ? "checked" : "";
       const cls = s.detected ? "tool-card detected" : "tool-card";
+      const uninstallBtn = s.detected
+        ? `<button class="tool-uninstall-btn" type="button" data-id="${t.id}" title="アンインストール">🗑</button>`
+        : "";
       return `
         <label class="${cls}" data-id="${t.id}">
           <input type="checkbox" data-id="${t.id}" ${checked} />
@@ -143,6 +146,7 @@ function renderToolPicker() {
             <div class="tool-desc">${escapeHtml(t.description)}</div>
           </div>
           <div class="tool-status">${badgeHtml(s.status, s.detected)}</div>
+          ${uninstallBtn}
         </label>
       `;
     }).join("");
@@ -173,6 +177,66 @@ function bindPickerEvents() {
       el.closest(".tool-card")?.classList.toggle("selected", getState(id).selected);
     }
   });
+  document.querySelectorAll<HTMLButtonElement>(".tool-uninstall-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (!id) return;
+      void confirmAndUninstall(id);
+    });
+  });
+}
+
+async function confirmAndUninstall(id: string) {
+  const tool = TOOLS.find((t) => t.id === id);
+  if (!tool) return;
+  const isDangerous = id === "homebrew" || id === "git";
+  const baseMsg = `「${tool.name}」をアンインストールします。よろしいですか？`;
+  const warning = id === "homebrew"
+    ? "\n\n⚠️ Homebrew を消すと、Homebrew で入れたツール (gh, Node.js, Obsidian など) が動かなくなる可能性があります。"
+    : id === "git"
+      ? "\n\n⚠️ Git は Mac の標準ツールに含まれているので、通常はアンインストールしません。"
+      : "";
+  if (!confirm(baseMsg + warning)) return;
+  if (isDangerous) {
+    if (!confirm(`もう一度確認します。\n本当に「${tool.name}」をアンインストールしますか？`)) return;
+  }
+
+  // Switch to installing screen for visible progress and logs
+  setState(id, {
+    status: "installing",
+    message: "アンインストール中…",
+    percent: 5,
+    selected: true,
+    logs: [],
+    logExpanded: false,
+  });
+  errors.clear();
+  // Show only this tool on the installing screen
+  for (const t of TOOLS) {
+    if (t.id !== id) setState(t.id, { selected: false });
+  }
+  show("installing");
+  renderToolListInstalling();
+
+  try {
+    await invoke("uninstall_tool", { id });
+    const cur = getState(id);
+    if (cur.status !== "error") {
+      setState(id, { status: "done", message: "アンインストール完了", percent: 100, detected: false });
+    }
+  } catch (e) {
+    const msg = typeof e === "string" ? e : JSON.stringify(e);
+    errors.set(id, msg);
+    setState(id, { status: "error", message: msg, percent: 0 });
+  }
+  renderToolListInstalling();
+
+  setTimeout(() => {
+    void refreshDetection();
+    show("welcome");
+  }, 1200);
 }
 
 function updateSelectSummary() {

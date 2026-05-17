@@ -404,6 +404,29 @@ async fn install_tool(app: AppHandle, id: String) -> Result<(), String> {
     result
 }
 
+#[tauri::command]
+async fn uninstall_tool(app: AppHandle, id: String) -> Result<(), String> {
+    let result: Result<(), String> = {
+        #[cfg(target_os = "macos")]
+        {
+            uninstall_macos(&app, &id).await
+        }
+        #[cfg(target_os = "windows")]
+        {
+            uninstall_windows(&app, &id).await
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            let _ = (&app, &id);
+            Err("Unsupported OS".to_string())
+        }
+    };
+    if let Err(ref e) = result {
+        emit_progress(&app, &id, "error", 0, e);
+    }
+    result
+}
+
 #[cfg(target_os = "macos")]
 async fn install_macos(app: &AppHandle, id: &str) -> Result<(), String> {
     match id {
@@ -602,6 +625,191 @@ async fn npm_install_global_macos(
     );
     run_streaming(app, tool, &npm, &args).await?;
     emit_progress(app, tool, "done", 100, "完了");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn uninstall_macos(app: &AppHandle, id: &str) -> Result<(), String> {
+    match id {
+        "git" => Err(
+            "Git (Xcode Command Line Tools) のアンインストールは行いません。Mac の標準ツールです"
+                .to_string(),
+        ),
+        "vscode" => {
+            emit_progress(app, "vscode", "installing", 30, "VS Code を削除中...");
+            let status = Command::new("rm")
+                .arg("-rf")
+                .arg("/Applications/Visual Studio Code.app")
+                .status()
+                .map_err(|e| format!("rm 実行失敗: {}", e))?;
+            if !status.success() {
+                return Err("VS Code の削除に失敗しました".to_string());
+            }
+            emit_progress(app, "vscode", "done", 100, "アンインストール完了");
+            Ok(())
+        }
+        "claude_code" => {
+            emit_progress(
+                app,
+                "claude_code",
+                "installing",
+                30,
+                "Claude Code を削除中...",
+            );
+            let _ = Command::new("rm")
+                .arg("-rf")
+                .arg(home_path(".claude/local"))
+                .status();
+            let _ = std::fs::remove_file(home_path(".local/bin/claude"));
+            emit_progress(app, "claude_code", "done", 100, "アンインストール完了");
+            Ok(())
+        }
+        "homebrew" => uninstall_homebrew_macos(app).await,
+        "node" => brew_uninstall_macos(app, "node", "node", false).await,
+        "gh" => brew_uninstall_macos(app, "gh", "gh", false).await,
+        "codex" => npm_uninstall_global_macos(app, "codex", "@openai/codex").await,
+        "gemini" => npm_uninstall_global_macos(app, "gemini", "@google/gemini-cli").await,
+        "obsidian" => brew_uninstall_macos(app, "obsidian", "obsidian", true).await,
+        _ => Err(format!("不明なツール: {}", id)),
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn uninstall_homebrew_macos(app: &AppHandle) -> Result<(), String> {
+    emit_progress(
+        app,
+        "homebrew",
+        "installing",
+        10,
+        "ターミナルで Homebrew アンインストーラを実行します...",
+    );
+    let inner = r#"/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)""#;
+    let escaped = inner.replace('\\', "\\\\").replace('"', "\\\"");
+    let osascript = format!(
+        r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+        escaped
+    );
+    Command::new("osascript")
+        .arg("-e")
+        .arg(&osascript)
+        .output()
+        .map_err(|e| format!("ターミナル起動失敗: {}", e))?;
+    emit_progress(
+        app,
+        "homebrew",
+        "done",
+        100,
+        "ターミナルで完了確認してください",
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn brew_uninstall_macos(
+    app: &AppHandle,
+    tool: &str,
+    formula: &str,
+    cask: bool,
+) -> Result<(), String> {
+    let brew = which_brew_macos()
+        .ok_or_else(|| "Homebrew が見つかりません".to_string())?;
+    let mut args: Vec<String> = vec!["uninstall".into()];
+    if cask {
+        args.push("--cask".into());
+    }
+    args.push(formula.into());
+    emit_progress(
+        app,
+        tool,
+        "installing",
+        30,
+        &format!("brew uninstall {} を実行中...", formula),
+    );
+    run_streaming(app, tool, &brew, &args).await?;
+    emit_progress(app, tool, "done", 100, "アンインストール完了");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn npm_uninstall_global_macos(
+    app: &AppHandle,
+    tool: &str,
+    package: &str,
+) -> Result<(), String> {
+    let npm = which_npm_macos().ok_or_else(|| "npm が見つかりません".to_string())?;
+    let args: Vec<String> = vec!["uninstall".into(), "-g".into(), package.into()];
+    emit_progress(
+        app,
+        tool,
+        "installing",
+        30,
+        &format!("npm uninstall -g {} を実行中...", package),
+    );
+    run_streaming(app, tool, &npm, &args).await?;
+    emit_progress(app, tool, "done", 100, "アンインストール完了");
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn uninstall_windows(app: &AppHandle, id: &str) -> Result<(), String> {
+    match id {
+        "git" => winget_uninstall(app, "git", "Git.Git").await,
+        "vscode" => winget_uninstall(app, "vscode", "Microsoft.VisualStudioCode").await,
+        "claude_code" => Err(
+            "Claude Code のアンインストールは手動で行ってください (claude --uninstall)".to_string(),
+        ),
+        "node" => winget_uninstall(app, "node", "OpenJS.NodeJS.LTS").await,
+        "gh" => winget_uninstall(app, "gh", "GitHub.cli").await,
+        "codex" => npm_uninstall_global_windows(app, "codex", "@openai/codex").await,
+        "gemini" => npm_uninstall_global_windows(app, "gemini", "@google/gemini-cli").await,
+        "obsidian" => winget_uninstall(app, "obsidian", "Obsidian.Obsidian").await,
+        "homebrew" => Err("Homebrew は macOS 専用です".to_string()),
+        _ => Err(format!("不明なツール: {}", id)),
+    }
+}
+
+#[cfg(target_os = "windows")]
+async fn winget_uninstall(app: &AppHandle, tool: &str, package_id: &str) -> Result<(), String> {
+    emit_progress(app, tool, "installing", 30, "winget でアンインストール中...");
+    let args: Vec<String> = vec![
+        "uninstall".into(),
+        "--id".into(),
+        package_id.into(),
+        "-e".into(),
+        "--silent".into(),
+    ];
+    let winget_path = PathBuf::from("winget");
+    run_streaming(app, tool, &winget_path, &args).await?;
+    emit_progress(app, tool, "done", 100, "アンインストール完了");
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn npm_uninstall_global_windows(
+    app: &AppHandle,
+    tool: &str,
+    package: &str,
+) -> Result<(), String> {
+    let npm = if which_bin("npm.cmd").is_some() {
+        PathBuf::from("npm.cmd")
+    } else if which_bin("npm").is_some() {
+        PathBuf::from("npm")
+    } else {
+        return Err("npm が見つかりません".to_string());
+    };
+    let args: Vec<String> = vec!["uninstall".into(), "-g".into(), package.into()];
+    emit_progress(
+        app,
+        tool,
+        "installing",
+        30,
+        &format!("npm uninstall -g {} を実行中...", package),
+    );
+    run_streaming(app, tool, &npm, &args).await?;
+    emit_progress(app, tool, "done", 100, "アンインストール完了");
     Ok(())
 }
 
@@ -820,6 +1028,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             detect_tool,
             install_tool,
+            uninstall_tool,
             quit_app,
             open_path,
             copy_to_clipboard,

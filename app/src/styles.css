@@ -142,7 +142,7 @@ h3 { font-size: 14px; font-weight: 600; margin: 14px 0 8px; }
 
 .tool-card {
   display: grid;
-  grid-template-columns: 28px 32px 1fr auto;
+  grid-template-columns: 28px 32px 1fr auto auto;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
@@ -152,6 +152,28 @@ h3 { font-size: 14px; font-weight: 600; margin: 14px 0 8px; }
   cursor: pointer;
   transition: all 0.12s ease;
   box-shadow: var(--shadow);
+}
+.tool-uninstall-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition: all 0.12s;
+  opacity: 0.5;
+}
+.tool-uninstall-btn:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: var(--error);
+  opacity: 1;
+}
+.tool-card:hover .tool-uninstall-btn {
+  opacity: 1;
 }
 .tool-card:hover {
   border-color: var(--primary);
