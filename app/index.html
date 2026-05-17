@@ -10,20 +10,31 @@
   <body>
     <main class="app">
       <section id="screen-welcome" class="screen active">
-        <div class="hero">
-          <div class="hero-icon">🚀</div>
-          <h1>Claude Kit へようこそ</h1>
+        <header class="welcome-head">
+          <div class="hero-icon hero-icon-anim">🚀</div>
+          <h1>Claude Kit</h1>
           <p class="lead">
-            開発に必要な道具をまとめてインストールします。
+            開発に必要な道具を、ボタン一つでまとめてセットアップ。
           </p>
-          <ul class="bullet">
-            <li>🌿 <b>Git</b> — コードのバージョン管理</li>
-            <li>📝 <b>Visual Studio Code</b> — エディタ</li>
-            <li>⌨️ <b>Claude Code</b> — ターミナル版Claude</li>
-          </ul>
-          <button id="btn-start" class="btn-primary">インストール開始</button>
-          <p class="note">所要時間 3〜8分／途中でパスワード入力を求められることがあります</p>
+        </header>
+
+        <div id="status-banner" class="status-banner"></div>
+
+        <div class="select-bar">
+          <span id="select-summary" class="select-summary">読み込み中…</span>
+          <div class="select-actions">
+            <button id="btn-select-missing" class="chip-btn" type="button">＋ まだ入ってないものを選ぶ</button>
+            <button id="btn-select-none" class="chip-btn" type="button">× 選択をクリア</button>
+            <button id="btn-recheck" class="chip-btn" type="button">⟳ 状態を再確認</button>
+          </div>
         </div>
+
+        <div id="tool-picker" class="tool-picker"></div>
+
+        <footer class="welcome-foot">
+          <p class="note">途中でパスワード入力が求められたら、Macのログインパスワードを入れてください</p>
+          <button id="btn-start" class="btn-primary" disabled>インストール開始</button>
+        </footer>
       </section>
 
       <section id="screen-installing" class="screen">
@@ -34,14 +45,43 @@
 
       <section id="screen-done" class="screen">
         <div class="hero">
-          <div class="hero-icon">🎉</div>
+          <div class="hero-icon hero-icon-bounce">🎉</div>
           <h1>セットアップ完了！</h1>
-          <p class="lead">これで開発を始める準備ができました。</p>
+          <p class="lead">開発を始める準備ができました。</p>
+
+          <div id="done-actions" class="done-actions"></div>
+
           <h3>次にやること</h3>
           <ol class="bullet">
             <li>VS Code を起動してみる</li>
             <li>ターミナルで <code>claude</code> と打つ</li>
+            <li>困ったら <code>claude --help</code> で確認</li>
           </ol>
+
+          <details class="info-card">
+            <summary>
+              <span class="info-icon">💡</span>
+              <span class="info-title">もっと先へ進みたいなら：<b>Nix</b> という選択肢</span>
+              <span class="info-toggle">▼</span>
+            </summary>
+            <div class="info-body">
+              <p><b>Nix</b> は「パッケージマネージャの完全進化版」と呼ばれる存在です。</p>
+              <ul class="info-list">
+                <li><b>何でも入る</b> — Homebrew/npm/pip など、バラバラの世界を 1 つに統合。約 12 万パッケージ</li>
+                <li><b>絶対に競合しない</b> — プロジェクトごとに完全に独立した依存関係を持てる</li>
+                <li><b>完全に再現できる</b> — <code>flake.nix</code> 1 ファイル渡すだけで、世界中の誰でも同じ環境が作れる</li>
+              </ul>
+              <p class="info-note">例えるなら：<br/>
+              　Homebrew = <em>Mac専用の便利な道具箱</em><br/>
+              　Nix = <em>OS を超えて、プロジェクトごとに完璧な道具箱を作れる魔法</em></p>
+              <p class="info-note"><b>注意:</b> 学習曲線は急で、CLI 操作前提。慣れた人向け。<br/>
+              「環境構築の手順書地獄から解放されたい」と思った時に検討する価値あり。</p>
+              <div class="info-actions">
+                <button id="btn-open-nix" class="btn-secondary" type="button">Nix 公式サイトを開く</button>
+              </div>
+            </div>
+          </details>
+
           <div id="error-summary" class="error-summary"></div>
           <button id="btn-finish" class="btn-primary">閉じる</button>
         </div>
