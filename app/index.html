@@ -18,14 +18,14 @@
           </p>
         </header>
 
+        <div id="status-banner" class="status-banner"></div>
+
         <div class="select-bar">
           <span id="select-summary" class="select-summary">読み込み中…</span>
           <div class="select-actions">
-            <button id="btn-select-all" class="link-btn" type="button">すべて選択</button>
-            <span class="dot">·</span>
-            <button id="btn-select-none" class="link-btn" type="button">すべて解除</button>
-            <span class="dot">·</span>
-            <button id="btn-recheck" class="link-btn" type="button">再確認</button>
+            <button id="btn-select-missing" class="chip-btn" type="button">＋ まだ入ってないものを選ぶ</button>
+            <button id="btn-select-none" class="chip-btn" type="button">× 選択をクリア</button>
+            <button id="btn-recheck" class="chip-btn" type="button">⟳ 状態を再確認</button>
           </div>
         </div>
 
@@ -57,6 +57,30 @@
             <li>ターミナルで <code>claude</code> と打つ</li>
             <li>困ったら <code>claude --help</code> で確認</li>
           </ol>
+
+          <details class="info-card">
+            <summary>
+              <span class="info-icon">💡</span>
+              <span class="info-title">もっと先へ進みたいなら：<b>Nix</b> という選択肢</span>
+              <span class="info-toggle">▼</span>
+            </summary>
+            <div class="info-body">
+              <p><b>Nix</b> は「パッケージマネージャの完全進化版」と呼ばれる存在です。</p>
+              <ul class="info-list">
+                <li><b>何でも入る</b> — Homebrew/npm/pip など、バラバラの世界を 1 つに統合。約 12 万パッケージ</li>
+                <li><b>絶対に競合しない</b> — プロジェクトごとに完全に独立した依存関係を持てる</li>
+                <li><b>完全に再現できる</b> — <code>flake.nix</code> 1 ファイル渡すだけで、世界中の誰でも同じ環境が作れる</li>
+              </ul>
+              <p class="info-note">例えるなら：<br/>
+              　Homebrew = <em>Mac専用の便利な道具箱</em><br/>
+              　Nix = <em>OS を超えて、プロジェクトごとに完璧な道具箱を作れる魔法</em></p>
+              <p class="info-note"><b>注意:</b> 学習曲線は急で、CLI 操作前提。慣れた人向け。<br/>
+              「環境構築の手順書地獄から解放されたい」と思った時に検討する価値あり。</p>
+              <div class="info-actions">
+                <button id="btn-open-nix" class="btn-secondary" type="button">Nix 公式サイトを開く</button>
+              </div>
+            </div>
+          </details>
 
           <div id="error-summary" class="error-summary"></div>
           <button id="btn-finish" class="btn-primary">閉じる</button>

@@ -91,6 +91,36 @@ async fn open_path(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Open Terminal.app (Mac) or cmd.exe (Win) and run a command in it.
+/// The window stays open so the user can see the output and interact.
+#[tauri::command]
+async fn open_terminal_with_command(command: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let escaped = command.replace('\\', "\\\\").replace('"', "\\\"");
+        let osascript = format!(
+            r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+            escaped
+        );
+        Command::new("osascript")
+            .arg("-e")
+            .arg(&osascript)
+            .output()
+            .map_err(|e| format!("ターミナル起動失敗: {}", e))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "cmd", "/K", &command])
+            .output()
+            .map_err(|e| format!("コマンドプロンプト起動失敗: {}", e))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn copy_to_clipboard(text: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -792,7 +822,8 @@ pub fn run() {
             install_tool,
             quit_app,
             open_path,
-            copy_to_clipboard
+            copy_to_clipboard,
+            open_terminal_with_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -181,9 +181,51 @@ function updateSelectSummary() {
   if (!el) return;
   const tools = visibleTools();
   const selected = tools.filter((t) => getState(t.id).selected);
-  el.textContent = `${selected.length} / ${tools.length} 個を選択中`;
+  const missing = tools.filter((t) => !getState(t.id).detected);
+  const installed = tools.length - missing.length;
+  el.textContent = `すでに ${installed}/${tools.length} 個 入っています  ·  選択中: ${selected.length}`;
   if (btn) {
     btn.disabled = selected.length === 0;
+    btn.textContent = selected.length === 0
+      ? "インストールするものを選んでください"
+      : `${selected.length} 個をインストール開始`;
+  }
+  renderStatusBanner(missing.length, tools.length);
+}
+
+function renderStatusBanner(missingCount: number, total: number) {
+  const banner = document.getElementById("status-banner");
+  if (!banner) return;
+  if (missingCount === 0) {
+    banner.innerHTML = `
+      <div class="banner banner-success">
+        <span class="banner-icon">✨</span>
+        <div class="banner-body">
+          <div class="banner-title">必要なツールはすべて揃っています！</div>
+          <div class="banner-desc">再インストールや追加で入れたいツールがあれば、下から選んでください。</div>
+        </div>
+      </div>
+    `;
+  } else if (missingCount === total) {
+    banner.innerHTML = `
+      <div class="banner banner-info">
+        <span class="banner-icon">👋</span>
+        <div class="banner-body">
+          <div class="banner-title">はじめまして！まずは基本ツールから入れていきましょう</div>
+          <div class="banner-desc">おすすめのツールに最初からチェックが入っています。そのまま「インストール開始」でOK。</div>
+        </div>
+      </div>
+    `;
+  } else {
+    banner.innerHTML = `
+      <div class="banner banner-info">
+        <span class="banner-icon">📦</span>
+        <div class="banner-body">
+          <div class="banner-title">あと ${missingCount} 個 入れられます</div>
+          <div class="banner-desc">入れたいツールにチェックを入れて「インストール開始」を押してください。</div>
+        </div>
+      </div>
+    `;
   }
 }
 
@@ -315,7 +357,8 @@ function renderErrorSummary() {
 
 interface QuickAction {
   label: string;
-  kind: "open" | "copy";
+  description: string;
+  kind: "open" | "copy" | "terminal";
   payload: string;
 }
 
@@ -324,18 +367,48 @@ function quickActionsFor(id: string): QuickAction[] {
   switch (id) {
     case "vscode":
       return isMac
-        ? [{ label: "VS Code を開く", kind: "open", payload: "/Applications/Visual Studio Code.app" }]
-        : [{ label: "VS Code を開く", kind: "open", payload: "code" }];
+        ? [{
+            label: "VS Code を開く",
+            description: "コードを書くエディタ。まずは触ってみる",
+            kind: "open",
+            payload: "/Applications/Visual Studio Code.app",
+          }]
+        : [{
+            label: "VS Code を開く",
+            description: "コードを書くエディタ。まずは触ってみる",
+            kind: "open",
+            payload: "code",
+          }];
     case "claude_code":
-      return [{ label: "ターミナルで打つコマンドをコピー", kind: "copy", payload: "claude" }];
+      return [{
+        label: "Claude Code を起動",
+        description: "ターミナルが開いて claude が動き出します。AIと対話開始",
+        kind: "terminal",
+        payload: "claude",
+      }];
     case "obsidian":
       return isMac
-        ? [{ label: "Obsidian を開く", kind: "open", payload: "/Applications/Obsidian.app" }]
+        ? [{
+            label: "Obsidian を開く",
+            description: "メモ・ナレッジを書き溜めるアプリ",
+            kind: "open",
+            payload: "/Applications/Obsidian.app",
+          }]
         : [];
     case "gh":
-      return [{ label: "GitHub ログインコマンドをコピー", kind: "copy", payload: "gh auth login" }];
+      return [{
+        label: "GitHub にログイン",
+        description: "Claude Code から GitHub を操作するため、1回だけログインが必要",
+        kind: "terminal",
+        payload: "gh auth login",
+      }];
     case "homebrew":
-      return [{ label: "更新コマンドをコピー", kind: "copy", payload: "brew update && brew upgrade" }];
+      return [{
+        label: "Homebrew を最新に更新",
+        description: "入っているツールをまとめてアップデート（時々やると安心）",
+        kind: "terminal",
+        payload: "brew update && brew upgrade",
+      }];
     default:
       return [];
   }
@@ -360,7 +433,10 @@ function renderDoneActions() {
       ${actions.map((a, i) => `
         <button class="done-action" data-idx="${i}" type="button">
           <span class="done-action-icon">${a.tool.icon}</span>
-          <span class="done-action-label">${escapeHtml(a.action.label)}</span>
+          <span class="done-action-body">
+            <span class="done-action-label">${escapeHtml(a.action.label)}</span>
+            <span class="done-action-desc">${escapeHtml(a.action.description)}</span>
+          </span>
         </button>
       `).join("")}
     </div>
@@ -373,16 +449,13 @@ function renderDoneActions() {
       try {
         if (entry.action.kind === "open") {
           await invoke("open_path", { path: entry.action.payload });
+          flashLabel(btn, "✓ 開きました");
+        } else if (entry.action.kind === "terminal") {
+          await invoke("open_terminal_with_command", { command: entry.action.payload });
+          flashLabel(btn, "✓ ターミナルを開きました");
         } else {
           await invoke("copy_to_clipboard", { text: entry.action.payload });
-          btn.classList.add("copied");
-          const original = btn.querySelector(".done-action-label")?.textContent;
-          const label = btn.querySelector(".done-action-label");
-          if (label) label.textContent = "✓ コピーしました";
-          setTimeout(() => {
-            if (label && original) label.textContent = original;
-            btn.classList.remove("copied");
-          }, 1500);
+          flashLabel(btn, "✓ コピーしました");
         }
       } catch (e) {
         const msg = typeof e === "string" ? e : JSON.stringify(e);
@@ -390,6 +463,18 @@ function renderDoneActions() {
       }
     });
   });
+}
+
+function flashLabel(btn: HTMLButtonElement, text: string) {
+  const label = btn.querySelector(".done-action-label");
+  if (!label) return;
+  const original = label.textContent;
+  btn.classList.add("copied");
+  label.textContent = text;
+  setTimeout(() => {
+    if (original) label.textContent = original;
+    btn.classList.remove("copied");
+  }, 1500);
 }
 
 void listen<ProgressEvent>("install:progress", (event) => {
@@ -428,9 +513,13 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("btn-finish")?.addEventListener("click", () => {
     void invoke("quit_app");
   });
-  document.getElementById("btn-select-all")?.addEventListener("click", () => {
+  document.getElementById("btn-open-nix")?.addEventListener("click", () => {
+    void invoke("open_path", { path: "https://nixos.org/" });
+  });
+  document.getElementById("btn-select-missing")?.addEventListener("click", () => {
     for (const t of visibleTools()) {
-      setState(t.id, { selected: true });
+      const s = getState(t.id);
+      setState(t.id, { selected: !s.detected });
     }
     renderToolPicker();
   });
