@@ -551,6 +551,48 @@ code {
 .info-note em { font-style: normal; color: var(--text); font-weight: 600; }
 .info-actions { margin-top: 10px; }
 
+.info-persona {
+  background: var(--surface-2);
+  border-left: 3px solid var(--primary);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+.info-persona-title {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+.info-persona-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.info-persona-list li {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.info-persona-list code {
+  font-size: 10px;
+  padding: 1px 5px;
+}
+.info-persona-warn {
+  font-size: 11px;
+  color: var(--warn);
+  font-weight: 600;
+  padding: 6px 8px;
+  background: #fef3c7;
+  border-radius: 4px;
+}
+@media (prefers-color-scheme: dark) {
+  .info-persona-warn { background: #3a2d15; color: #fbbf24; }
+}
+
 .error-summary {
   align-self: stretch;
   text-align: left;
