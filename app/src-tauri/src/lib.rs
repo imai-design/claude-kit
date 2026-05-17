@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
@@ -10,6 +10,9 @@ use tauri::{AppHandle, Emitter};
 const VSCODE_MACOS_URL: &str = "https://update.code.visualstudio.com/latest/darwin-universal/stable";
 #[cfg(target_os = "macos")]
 const CLAUDE_CODE_UNIX_INSTALLER: &str = "https://claude.ai/install.sh";
+#[cfg(target_os = "macos")]
+const HOMEBREW_INSTALLER: &str =
+    "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh";
 
 #[derive(Clone, Serialize)]
 struct InstallProgress {
@@ -17,6 +20,12 @@ struct InstallProgress {
     phase: String,
     percent: u32,
     message: String,
+}
+
+#[derive(Clone, Serialize)]
+struct InstallLog {
+    tool: String,
+    line: String,
 }
 
 fn emit_progress(app: &AppHandle, tool: &str, phase: &str, percent: u32, message: &str) {
@@ -27,6 +36,16 @@ fn emit_progress(app: &AppHandle, tool: &str, phase: &str, percent: u32, message
             phase: phase.to_string(),
             percent,
             message: message.to_string(),
+        },
+    );
+}
+
+fn emit_log(app: &AppHandle, tool: &str, line: &str) {
+    let _ = app.emit(
+        "install:log",
+        InstallLog {
+            tool: tool.to_string(),
+            line: line.to_string(),
         },
     );
 }
@@ -53,6 +72,59 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+async fn open_path(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path)
+            .output()
+            .map_err(|e| format!("open 失敗: {}", e))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", &path])
+            .output()
+            .map_err(|e| format!("start 失敗: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn copy_to_clipboard(text: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::io::Write;
+        let mut child = Command::new("pbcopy")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("pbcopy 失敗: {}", e))?;
+        if let Some(stdin) = child.stdin.as_mut() {
+            stdin
+                .write_all(text.as_bytes())
+                .map_err(|e| format!("pbcopy 書き込み失敗: {}", e))?;
+        }
+        child.wait().map_err(|e| format!("pbcopy 待機失敗: {}", e))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::io::Write;
+        let mut child = Command::new("cmd")
+            .args(["/C", "clip"])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("clip 失敗: {}", e))?;
+        if let Some(stdin) = child.stdin.as_mut() {
+            stdin
+                .write_all(text.as_bytes())
+                .map_err(|e| format!("clip 書き込み失敗: {}", e))?;
+        }
+        child.wait().map_err(|e| format!("clip 待機失敗: {}", e))?;
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 fn detect_macos(id: &str) -> bool {
     match id {
@@ -70,6 +142,28 @@ fn detect_macos(id: &str) -> bool {
                 || PathBuf::from("/usr/local/bin/claude").exists()
                 || PathBuf::from("/opt/homebrew/bin/claude").exists()
         }
+        "homebrew" => which_brew_macos().is_some(),
+        "node" => {
+            which_bin("node").is_some()
+                || PathBuf::from("/opt/homebrew/bin/node").exists()
+                || PathBuf::from("/usr/local/bin/node").exists()
+        }
+        "gh" => {
+            which_bin("gh").is_some()
+                || PathBuf::from("/opt/homebrew/bin/gh").exists()
+                || PathBuf::from("/usr/local/bin/gh").exists()
+        }
+        "codex" => {
+            which_bin("codex").is_some()
+                || PathBuf::from("/opt/homebrew/bin/codex").exists()
+                || PathBuf::from("/usr/local/bin/codex").exists()
+        }
+        "gemini" => {
+            which_bin("gemini").is_some()
+                || PathBuf::from("/opt/homebrew/bin/gemini").exists()
+                || PathBuf::from("/usr/local/bin/gemini").exists()
+        }
+        "obsidian" => PathBuf::from("/Applications/Obsidian.app").exists(),
         _ => false,
     }
 }
@@ -129,6 +223,37 @@ fn detect_windows(id: &str) -> bool {
                 || path_exists(format!("{}\\npm\\claude.cmd", app_data))
                 || path_exists(format!("{}\\npm\\claude.exe", app_data))
         }
+        "node" => {
+            which_bin("node.exe").is_some()
+                || path_exists(format!("{}\\nodejs\\node.exe", program_files))
+                || path_exists(format!("{}\\nodejs\\node.exe", program_files_x86))
+                || registry_display_name_contains("Node.js")
+        }
+        "gh" => {
+            which_bin("gh.exe").is_some()
+                || path_exists(format!("{}\\GitHub CLI\\gh.exe", program_files))
+                || path_exists(format!("{}\\GitHub CLI\\gh.exe", program_files_x86))
+                || registry_display_name_contains("GitHub CLI")
+        }
+        "codex" => {
+            which_bin("codex.cmd").is_some()
+                || which_bin("codex.exe").is_some()
+                || path_exists(format!("{}\\npm\\codex.cmd", app_data))
+                || path_exists(format!("{}\\npm\\codex.exe", app_data))
+        }
+        "gemini" => {
+            which_bin("gemini.cmd").is_some()
+                || which_bin("gemini.exe").is_some()
+                || path_exists(format!("{}\\npm\\gemini.cmd", app_data))
+                || path_exists(format!("{}\\npm\\gemini.exe", app_data))
+        }
+        "obsidian" => {
+            path_exists(format!("{}\\Obsidian\\Obsidian.exe", local_app_data))
+                || path_exists(format!("{}\\Programs\\Obsidian\\Obsidian.exe", local_app_data))
+                || path_exists(format!("{}\\Obsidian\\Obsidian.exe", program_files))
+                || registry_display_name_contains("Obsidian")
+        }
+        "homebrew" => false,
         _ => false,
     }
 }
@@ -196,6 +321,36 @@ fn home_path(rel: &str) -> PathBuf {
     PathBuf::from(home).join(rel)
 }
 
+#[cfg(target_os = "macos")]
+fn which_brew_macos() -> Option<PathBuf> {
+    if let Some(p) = which_bin("brew") {
+        return Some(p);
+    }
+    let candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
+    for c in candidates {
+        let p = PathBuf::from(c);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn which_npm_macos() -> Option<PathBuf> {
+    if let Some(p) = which_bin("npm") {
+        return Some(p);
+    }
+    let candidates = ["/opt/homebrew/bin/npm", "/usr/local/bin/npm"];
+    for c in candidates {
+        let p = PathBuf::from(c);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    None
+}
+
 #[tauri::command]
 async fn install_tool(app: AppHandle, id: String) -> Result<(), String> {
     let result: Result<(), String> = {
@@ -225,6 +380,12 @@ async fn install_macos(app: &AppHandle, id: &str) -> Result<(), String> {
         "git" => install_git_macos(app).await,
         "vscode" => install_vscode_macos(app).await,
         "claude_code" => install_claude_code_unix(app).await,
+        "homebrew" => install_homebrew_macos(app).await,
+        "node" => brew_install_macos(app, "node", "node", false).await,
+        "gh" => brew_install_macos(app, "gh", "gh", false).await,
+        "codex" => npm_install_global_macos(app, "codex", "@openai/codex").await,
+        "gemini" => npm_install_global_macos(app, "gemini", "@google/gemini-cli").await,
+        "obsidian" => brew_install_macos(app, "obsidian", "obsidian", true).await,
         _ => Err(format!("不明なツール: {}", id)),
     }
 }
@@ -312,12 +473,120 @@ async fn install_claude_code_unix(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Open Terminal.app and run the official Homebrew installer there.
+/// The user enters their password in Terminal; we poll for `brew` to appear.
+#[cfg(target_os = "macos")]
+async fn install_homebrew_macos(app: &AppHandle) -> Result<(), String> {
+    if which_brew_macos().is_some() {
+        emit_progress(app, "homebrew", "done", 100, "すでにインストール済み");
+        return Ok(());
+    }
+    emit_progress(
+        app,
+        "homebrew",
+        "installing",
+        10,
+        "ターミナルを開きます。パスワードを入力してください...",
+    );
+    let inner = format!(r#"/bin/bash -c "$(curl -fsSL {})""#, HOMEBREW_INSTALLER);
+    let escaped = inner.replace('\\', "\\\\").replace('"', "\\\"");
+    let osascript = format!(
+        r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+        escaped
+    );
+    Command::new("osascript")
+        .arg("-e")
+        .arg(&osascript)
+        .output()
+        .map_err(|e| format!("ターミナル起動に失敗: {}", e))?;
+
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_secs(900) {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        if which_brew_macos().is_some() {
+            emit_progress(app, "homebrew", "done", 100, "完了");
+            return Ok(());
+        }
+        let pct = 10 + (start.elapsed().as_secs() as u32 / 12).min(85);
+        emit_progress(
+            app,
+            "homebrew",
+            "installing",
+            pct,
+            "ターミナルでインストールが完了するのを待っています...",
+        );
+    }
+    Err(
+        "Homebrew インストールがタイムアウトしました (ターミナルで完了後、再度試してください)"
+            .to_string(),
+    )
+}
+
+/// `brew install [--cask] <formula>` を実行し、stdout/stderr を行単位で UI に流す。
+#[cfg(target_os = "macos")]
+async fn brew_install_macos(
+    app: &AppHandle,
+    tool: &str,
+    formula: &str,
+    cask: bool,
+) -> Result<(), String> {
+    let brew = which_brew_macos().ok_or_else(|| {
+        "Homebrew が見つかりません。先に Homebrew をインストールしてください".to_string()
+    })?;
+    let mut args: Vec<String> = vec!["install".into()];
+    if cask {
+        args.push("--cask".into());
+    }
+    args.push(formula.into());
+    emit_progress(
+        app,
+        tool,
+        "installing",
+        20,
+        &format!("brew install {} を実行中...", formula),
+    );
+    run_streaming(app, tool, &brew, &args).await?;
+    emit_progress(app, tool, "done", 100, "完了");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn npm_install_global_macos(
+    app: &AppHandle,
+    tool: &str,
+    package: &str,
+) -> Result<(), String> {
+    let npm = which_npm_macos().ok_or_else(|| {
+        "Node.js (npm) が見つかりません。先に Node.js をインストールしてください".to_string()
+    })?;
+    let args: Vec<String> = vec!["install".into(), "-g".into(), package.into()];
+    emit_progress(
+        app,
+        tool,
+        "installing",
+        20,
+        &format!("npm install -g {} を実行中...", package),
+    );
+    run_streaming(app, tool, &npm, &args).await?;
+    emit_progress(app, tool, "done", 100, "完了");
+    Ok(())
+}
+
 #[cfg(target_os = "windows")]
 async fn install_windows(app: &AppHandle, id: &str) -> Result<(), String> {
     match id {
         "git" => winget_install(app, "git", "Git.Git", None).await,
         "vscode" => winget_install(app, "vscode", "Microsoft.VisualStudioCode", None).await,
         "claude_code" => install_claude_code_windows(app).await,
+        "node" => winget_install(app, "node", "OpenJS.NodeJS.LTS", None).await,
+        "gh" => winget_install(app, "gh", "GitHub.cli", None).await,
+        "codex" => npm_install_global_windows(app, "codex", "@openai/codex").await,
+        "gemini" => npm_install_global_windows(app, "gemini", "@google/gemini-cli").await,
+        "obsidian" => winget_install(app, "obsidian", "Obsidian.Obsidian", None).await,
+        "homebrew" => Err("Homebrew は macOS 専用です".to_string()),
         _ => Err(format!("不明なツール: {}", id)),
     }
 }
@@ -344,17 +613,8 @@ async fn winget_install(
         args.push("--scope".into());
         args.push(s.into());
     }
-    let output = Command::new("winget")
-        .args(&args)
-        .output()
-        .map_err(|e| format!("winget 実行失敗: {}", e))?;
-    if !output.status.success() {
-        return Err(format!(
-            "winget install {} 失敗: {}",
-            package_id,
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
+    let winget_path = PathBuf::from("winget");
+    run_streaming(app, tool, &winget_path, &args).await?;
     emit_progress(app, tool, "done", 100, "完了");
     Ok(())
 }
@@ -379,6 +639,88 @@ async fn install_claude_code_windows(app: &AppHandle) -> Result<(), String> {
         ));
     }
     emit_progress(app, "claude_code", "done", 100, "完了");
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn npm_install_global_windows(
+    app: &AppHandle,
+    tool: &str,
+    package: &str,
+) -> Result<(), String> {
+    let npm = if which_bin("npm.cmd").is_some() {
+        PathBuf::from("npm.cmd")
+    } else if which_bin("npm").is_some() {
+        PathBuf::from("npm")
+    } else {
+        return Err(
+            "Node.js (npm) が見つかりません。先に Node.js をインストールしてください".to_string(),
+        );
+    };
+    let args: Vec<String> = vec!["install".into(), "-g".into(), package.into()];
+    emit_progress(
+        app,
+        tool,
+        "installing",
+        20,
+        &format!("npm install -g {} を実行中...", package),
+    );
+    run_streaming(app, tool, &npm, &args).await?;
+    emit_progress(app, tool, "done", 100, "完了");
+    Ok(())
+}
+
+/// 子プロセスを spawn し、stdout/stderr を行単位で `install:log` event として配信する。
+/// 標準出力に何が流れているかが UI から見えるようになる。
+async fn run_streaming(
+    app: &AppHandle,
+    tool: &str,
+    program: &Path,
+    args: &[String],
+) -> Result<(), String> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::process::Command as TokioCommand;
+
+    let mut cmd = TokioCommand::new(program);
+    cmd.args(args);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("{:?} の実行に失敗: {}", program, e))?;
+    let stdout = child.stdout.take().ok_or("stdout 取得失敗")?;
+    let stderr = child.stderr.take().ok_or("stderr 取得失敗")?;
+    let mut out_lines = BufReader::new(stdout).lines();
+    let mut err_lines = BufReader::new(stderr).lines();
+
+    let app_out = app.clone();
+    let tool_out = tool.to_string();
+    let out_task = tokio::spawn(async move {
+        while let Ok(Some(line)) = out_lines.next_line().await {
+            emit_log(&app_out, &tool_out, &line);
+        }
+    });
+    let app_err = app.clone();
+    let tool_err = tool.to_string();
+    let err_task = tokio::spawn(async move {
+        while let Ok(Some(line)) = err_lines.next_line().await {
+            emit_log(&app_err, &tool_err, &line);
+        }
+    });
+
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| format!("プロセス待機失敗: {}", e))?;
+    let _ = out_task.await;
+    let _ = err_task.await;
+    if !status.success() {
+        return Err(format!(
+            "実行に失敗しました (exit code: {})",
+            status.code().unwrap_or(-1)
+        ));
+    }
     Ok(())
 }
 
@@ -445,7 +787,13 @@ async fn download_with_progress(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![detect_tool, install_tool, quit_app])
+        .invoke_handler(tauri::generate_handler![
+            detect_tool,
+            install_tool,
+            quit_app,
+            open_path,
+            copy_to_clipboard
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

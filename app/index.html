@@ -10,20 +10,31 @@
   <body>
     <main class="app">
       <section id="screen-welcome" class="screen active">
-        <div class="hero">
-          <div class="hero-icon">🚀</div>
-          <h1>Claude Kit へようこそ</h1>
+        <header class="welcome-head">
+          <div class="hero-icon hero-icon-anim">🚀</div>
+          <h1>Claude Kit</h1>
           <p class="lead">
-            開発に必要な道具をまとめてインストールします。
+            開発に必要な道具を、ボタン一つでまとめてセットアップ。
           </p>
-          <ul class="bullet">
-            <li>🌿 <b>Git</b> — コードのバージョン管理</li>
-            <li>📝 <b>Visual Studio Code</b> — エディタ</li>
-            <li>⌨️ <b>Claude Code</b> — ターミナル版Claude</li>
-          </ul>
-          <button id="btn-start" class="btn-primary">インストール開始</button>
-          <p class="note">所要時間 3〜8分／途中でパスワード入力を求められることがあります</p>
+        </header>
+
+        <div class="select-bar">
+          <span id="select-summary" class="select-summary">読み込み中…</span>
+          <div class="select-actions">
+            <button id="btn-select-all" class="link-btn" type="button">すべて選択</button>
+            <span class="dot">·</span>
+            <button id="btn-select-none" class="link-btn" type="button">すべて解除</button>
+            <span class="dot">·</span>
+            <button id="btn-recheck" class="link-btn" type="button">再確認</button>
+          </div>
         </div>
+
+        <div id="tool-picker" class="tool-picker"></div>
+
+        <footer class="welcome-foot">
+          <p class="note">途中でパスワード入力が求められたら、Macのログインパスワードを入れてください</p>
+          <button id="btn-start" class="btn-primary" disabled>インストール開始</button>
+        </footer>
       </section>
 
       <section id="screen-installing" class="screen">
@@ -34,14 +45,19 @@
 
       <section id="screen-done" class="screen">
         <div class="hero">
-          <div class="hero-icon">🎉</div>
+          <div class="hero-icon hero-icon-bounce">🎉</div>
           <h1>セットアップ完了！</h1>
-          <p class="lead">これで開発を始める準備ができました。</p>
+          <p class="lead">開発を始める準備ができました。</p>
+
+          <div id="done-actions" class="done-actions"></div>
+
           <h3>次にやること</h3>
           <ol class="bullet">
             <li>VS Code を起動してみる</li>
             <li>ターミナルで <code>claude</code> と打つ</li>
+            <li>困ったら <code>claude --help</code> で確認</li>
           </ol>
+
           <div id="error-summary" class="error-summary"></div>
           <button id="btn-finish" class="btn-primary">閉じる</button>
         </div>
