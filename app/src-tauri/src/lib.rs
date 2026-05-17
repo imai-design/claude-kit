@@ -194,6 +194,11 @@ fn detect_macos(id: &str) -> bool {
                 || PathBuf::from("/usr/local/bin/gemini").exists()
         }
         "obsidian" => PathBuf::from("/Applications/Obsidian.app").exists(),
+        "nix" => {
+            which_bin("nix").is_some()
+                || PathBuf::from("/nix/var/nix").exists()
+                || PathBuf::from("/run/current-system/sw/bin/nix").exists()
+        }
         _ => false,
     }
 }
@@ -439,8 +444,55 @@ async fn install_macos(app: &AppHandle, id: &str) -> Result<(), String> {
         "codex" => npm_install_global_macos(app, "codex", "@openai/codex").await,
         "gemini" => npm_install_global_macos(app, "gemini", "@google/gemini-cli").await,
         "obsidian" => brew_install_macos(app, "obsidian", "obsidian", true).await,
+        "nix" => install_nix_macos(app).await,
         _ => Err(format!("不明なツール: {}", id)),
     }
+}
+
+#[cfg(target_os = "macos")]
+async fn install_nix_macos(app: &AppHandle) -> Result<(), String> {
+    if which_bin("nix").is_some() {
+        emit_progress(app, "nix", "done", 100, "すでにインストール済み");
+        return Ok(());
+    }
+    emit_progress(
+        app,
+        "nix",
+        "installing",
+        10,
+        "ターミナルを開きます。Nix のインストールには管理者パスワードが必要です...",
+    );
+    let inner = r#"sh <(curl -L https://nixos.org/nix/install) --daemon"#;
+    let escaped = inner.replace('\\', "\\\\").replace('"', "\\\"");
+    let osascript = format!(
+        r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+        escaped
+    );
+    Command::new("osascript")
+        .arg("-e")
+        .arg(&osascript)
+        .output()
+        .map_err(|e| format!("ターミナル起動失敗: {}", e))?;
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_secs(900) {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        if which_bin("nix").is_some() || PathBuf::from("/nix/var/nix").exists() {
+            emit_progress(app, "nix", "done", 100, "完了 (新しいターミナルで利用可能)");
+            return Ok(());
+        }
+        let pct = 10 + (start.elapsed().as_secs() as u32 / 12).min(85);
+        emit_progress(
+            app,
+            "nix",
+            "installing",
+            pct,
+            "ターミナルで Nix のインストールが完了するのを待っています...",
+        );
+    }
+    Err("Nix インストールがタイムアウトしました".to_string())
 }
 
 #[cfg(target_os = "macos")]
@@ -670,8 +722,42 @@ async fn uninstall_macos(app: &AppHandle, id: &str) -> Result<(), String> {
         "codex" => npm_uninstall_global_macos(app, "codex", "@openai/codex").await,
         "gemini" => npm_uninstall_global_macos(app, "gemini", "@google/gemini-cli").await,
         "obsidian" => brew_uninstall_macos(app, "obsidian", "obsidian", true).await,
+        "nix" => uninstall_nix_macos(app).await,
         _ => Err(format!("不明なツール: {}", id)),
     }
+}
+
+#[cfg(target_os = "macos")]
+async fn uninstall_nix_macos(app: &AppHandle) -> Result<(), String> {
+    emit_progress(
+        app,
+        "nix",
+        "installing",
+        10,
+        "Nix のアンインストールはターミナルで手動実行します...",
+    );
+    let inner = r#"echo '⚠️ Nix の安全な削除には公式手順が必要です。'; echo '詳細: https://nixos.org/manual/nix/stable/installation/uninstall.html'; open https://nixos.org/manual/nix/stable/installation/uninstall.html"#;
+    let escaped = inner.replace('\\', "\\\\").replace('"', "\\\"");
+    let osascript = format!(
+        r#"tell application "Terminal"
+    activate
+    do script "{}"
+end tell"#,
+        escaped
+    );
+    Command::new("osascript")
+        .arg("-e")
+        .arg(&osascript)
+        .output()
+        .map_err(|e| format!("ターミナル起動失敗: {}", e))?;
+    emit_progress(
+        app,
+        "nix",
+        "done",
+        100,
+        "公式の削除手順ページを開きました",
+    );
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
@@ -767,6 +853,7 @@ async fn uninstall_windows(app: &AppHandle, id: &str) -> Result<(), String> {
         "gemini" => npm_uninstall_global_windows(app, "gemini", "@google/gemini-cli").await,
         "obsidian" => winget_uninstall(app, "obsidian", "Obsidian.Obsidian").await,
         "homebrew" => Err("Homebrew は macOS 専用です".to_string()),
+        "nix" => Err("Nix は macOS 専用です (Windows は WSL を使ってください)".to_string()),
         _ => Err(format!("不明なツール: {}", id)),
     }
 }
@@ -825,6 +912,7 @@ async fn install_windows(app: &AppHandle, id: &str) -> Result<(), String> {
         "gemini" => npm_install_global_windows(app, "gemini", "@google/gemini-cli").await,
         "obsidian" => winget_install(app, "obsidian", "Obsidian.Obsidian", None).await,
         "homebrew" => Err("Homebrew は macOS 専用です".to_string()),
+        "nix" => Err("Nix は macOS 専用です (Windows は WSL を使ってください)".to_string()),
         _ => Err(format!("不明なツール: {}", id)),
     }
 }

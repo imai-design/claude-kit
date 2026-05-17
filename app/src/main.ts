@@ -4,6 +4,11 @@ import { listen } from "@tauri-apps/api/event";
 type ToolOS = "all" | "mac" | "win";
 type ToolCategory = "core" | "ai" | "editor" | "extras";
 
+interface TerminalStep {
+  prompt: string; // ターミナルに表示される文字 (例: "Password:")
+  action: string; // ユーザーがすべきこと
+}
+
 interface Tool {
   id: string;
   name: string;
@@ -12,18 +17,47 @@ interface Tool {
   category: ToolCategory;
   os: ToolOS;
   recommended: boolean;
+  terminalSteps?: TerminalStep[];
 }
 
 const TOOLS: Tool[] = [
-  { id: "git", name: "Git", description: "コードのバージョン管理", icon: "🌿", category: "core", os: "all", recommended: true },
-  { id: "vscode", name: "Visual Studio Code", description: "コードエディタ", icon: "📝", category: "editor", os: "all", recommended: true },
-  { id: "claude_code", name: "Claude Code", description: "ターミナル版 Claude", icon: "⌨️", category: "ai", os: "all", recommended: true },
-  { id: "homebrew", name: "Homebrew", description: "Mac のパッケージマネージャ", icon: "🍺", category: "core", os: "mac", recommended: true },
-  { id: "node", name: "Node.js (LTS)", description: "JavaScript 実行環境 (npm 同梱)", icon: "🟢", category: "core", os: "all", recommended: true },
-  { id: "gh", name: "GitHub CLI", description: "ターミナルから GitHub 操作", icon: "🐙", category: "core", os: "all", recommended: false },
-  { id: "codex", name: "Codex CLI", description: "OpenAI のターミナル AI (Node 必須)", icon: "🟣", category: "ai", os: "all", recommended: false },
-  { id: "gemini", name: "Gemini CLI", description: "Google のターミナル AI (Node 必須)", icon: "💎", category: "ai", os: "all", recommended: false },
-  { id: "obsidian", name: "Obsidian", description: "メモ・ナレッジ管理アプリ", icon: "🗒️", category: "extras", os: "all", recommended: false },
+  { id: "git", name: "Git", description: "コードを保存・履歴管理。間違えても前に戻せる安全装置", icon: "🌿", category: "core", os: "all", recommended: true },
+  { id: "vscode", name: "Visual Studio Code", description: "コードを書く場所。世界で一番使われているエディタ", icon: "📝", category: "editor", os: "all", recommended: true },
+  { id: "claude_code", name: "Claude Code", description: "ターミナルで Claude と対話。コード書きもPC操作もお願いできる", icon: "⌨️", category: "ai", os: "all", recommended: true },
+  {
+    id: "homebrew",
+    name: "Homebrew",
+    description: "Mac で他のツールを入れる土台。これがあると後が楽",
+    icon: "🍺",
+    category: "core",
+    os: "mac",
+    recommended: true,
+    terminalSteps: [
+      { prompt: "Press RETURN/ENTER to continue or any other key to abort:", action: "Enter キー を押す" },
+      { prompt: "Password:", action: "Mac のログインパスワード を入力 (※打っても画面に何も出ませんが、それで正常)" },
+      { prompt: "Installation successful!", action: "完了。このアプリに戻ると自動で「✓ 完了」になります" },
+    ],
+  },
+  { id: "node", name: "Node.js (LTS)", description: "JavaScript ツールを動かすエンジン。Codex/Gemini CLI に必要", icon: "🟢", category: "core", os: "all", recommended: true },
+  { id: "gh", name: "GitHub CLI", description: "Claude Code から GitHub を操作するため。1 回ログインすればOK", icon: "🐙", category: "core", os: "all", recommended: false },
+  { id: "codex", name: "Codex CLI", description: "OpenAI版のターミナル AI。Claude Code と切り替えて使える", icon: "🟣", category: "ai", os: "all", recommended: false },
+  { id: "gemini", name: "Gemini CLI", description: "Google版のターミナル AI。Claude Code から呼び出すこともできる", icon: "💎", category: "ai", os: "all", recommended: false },
+  { id: "obsidian", name: "Obsidian", description: "Markdown でメモを書き溜めるアプリ。Claude と連携できる", icon: "🗒️", category: "extras", os: "all", recommended: false },
+  {
+    id: "nix",
+    name: "Nix",
+    description: "プロジェクト単位で環境を完璧に固定できる上級者向けツール",
+    icon: "❄️",
+    category: "extras",
+    os: "mac",
+    recommended: false,
+    terminalSteps: [
+      { prompt: "Would you like to see a more detailed list of what I will do during this installation?", action: "n と入力 → Enter" },
+      { prompt: "Ready to continue?", action: "y と入力 → Enter" },
+      { prompt: "Password:", action: "Mac のログインパスワード を入力 (※何も表示されないが正常)" },
+      { prompt: "Nix is now installed", action: "完了。新しいターミナルで `nix` コマンドが使えます" },
+    ],
+  },
 ];
 
 const CATEGORY_LABEL: Record<ToolCategory, string> = {
@@ -31,6 +65,13 @@ const CATEGORY_LABEL: Record<ToolCategory, string> = {
   editor: "エディタ",
   ai: "AI ツール",
   extras: "おまけ",
+};
+
+const CATEGORY_LEAD: Record<ToolCategory, string> = {
+  core: "コードを書き始める前に揃えておく土台",
+  editor: "実際にコードを書く場所",
+  ai: "AI に手伝ってもらうための仲間たち",
+  extras: "興味があれば。なくてもOK",
 };
 
 type Status = "queued" | "installing" | "done" | "error";
@@ -152,7 +193,10 @@ function renderToolPicker() {
     }).join("");
     sections.push(`
       <div class="category">
-        <h3 class="category-title">${CATEGORY_LABEL[cat]}</h3>
+        <div class="category-head">
+          <h3 class="category-title">${CATEGORY_LABEL[cat]}</h3>
+          <span class="category-lead">${escapeHtml(CATEGORY_LEAD[cat])}</span>
+        </div>
         <div class="category-list">${cards}</div>
       </div>
     `);
@@ -309,6 +353,22 @@ function renderToolListInstalling() {
     const logBody = s.logExpanded && s.logs.length > 0
       ? `<pre class="log-body">${escapeHtml(s.logs.slice(-200).join("\n"))}</pre>`
       : "";
+    const terminalGuide = (t.terminalSteps && s.status === "installing")
+      ? `
+        <div class="terminal-guide">
+          <div class="terminal-guide-title">📺 ターミナルでこう進めてください</div>
+          <ol class="terminal-guide-list">
+            ${t.terminalSteps.map((step) => `
+              <li>
+                <div class="terminal-guide-prompt"><code>${escapeHtml(step.prompt)}</code> と出たら</div>
+                <div class="terminal-guide-action">${escapeHtml(step.action)}</div>
+              </li>
+            `).join("")}
+          </ol>
+          <div class="terminal-guide-note">完了するとこの画面が自動で「✓ 完了」に切り替わります</div>
+        </div>
+      `
+      : "";
     return `
       <div class="tool" data-id="${t.id}">
         <div class="tool-row">
@@ -320,6 +380,7 @@ function renderToolListInstalling() {
           </div>
           <div class="tool-status">${badgeHtml(s.status, s.detected)}</div>
         </div>
+        ${terminalGuide}
         ${logToggle}
         ${logBody}
       </div>
@@ -578,6 +639,9 @@ window.addEventListener("DOMContentLoaded", () => {
     void invoke("quit_app");
   });
   document.getElementById("btn-open-nix")?.addEventListener("click", () => {
+    void invoke("open_path", { path: "https://nixos.org/" });
+  });
+  document.getElementById("btn-open-nix-welcome")?.addEventListener("click", () => {
     void invoke("open_path", { path: "https://nixos.org/" });
   });
   document.getElementById("btn-select-missing")?.addEventListener("click", () => {

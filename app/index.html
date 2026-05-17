@@ -31,6 +31,27 @@
 
         <div id="tool-picker" class="tool-picker"></div>
 
+        <details class="info-card info-card-compact">
+          <summary>
+            <span class="info-icon">❄️</span>
+            <span class="info-title">もっと本格的にやりたい？ <b>Nix</b> という選択肢</span>
+            <span class="info-toggle">▼</span>
+          </summary>
+          <div class="info-body">
+            <p><b>Nix</b> は「パッケージマネージャの完全進化版」と呼ばれる存在です。</p>
+            <ul class="info-list">
+              <li><b>何でも入る</b> — Homebrew/npm/pip など、バラバラの世界を 1 つに統合。約 12 万パッケージ</li>
+              <li><b>絶対に競合しない</b> — プロジェクトごとに完全に独立した依存関係を持てる</li>
+              <li><b>完全に再現できる</b> — <code>flake.nix</code> 1 ファイル渡すだけで、誰でも同じ環境が作れる</li>
+            </ul>
+            <p class="info-note"><b>注意:</b> 学習曲線は急で CLI 操作前提。慣れた人向け。<br/>
+            「環境構築の手順書地獄から解放されたい」と思った時に検討する価値あり。</p>
+            <div class="info-actions">
+              <button id="btn-open-nix-welcome" class="btn-secondary" type="button">Nix 公式サイトを開く</button>
+            </div>
+          </div>
+        </details>
+
         <footer class="welcome-foot">
           <p class="note">途中でパスワード入力が求められたら、Macのログインパスワードを入れてください</p>
           <button id="btn-start" class="btn-primary" disabled>インストール開始</button>
