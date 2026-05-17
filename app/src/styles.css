@@ -195,6 +195,20 @@ h3 { font-size: 14px; font-weight: 600; margin: 14px 0 8px; }
 .tool-card.detected {
   background: var(--surface-2);
 }
+.tool-card.alt-by-nix {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+.tool-alt-note {
+  font-size: 10px;
+  color: #4338ca;
+  font-weight: 600;
+  margin-top: 3px;
+}
+@media (prefers-color-scheme: dark) {
+  .tool-card.alt-by-nix { background: #1e1b3a; border-color: #4f46e5; }
+  .tool-alt-note { color: #a5b4fc; }
+}
 .tool-card input[type="checkbox"] {
   width: 18px;
   height: 18px;

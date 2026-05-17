@@ -35,7 +35,8 @@ const TOOLS: Tool[] = [
     terminalSteps: [
       { prompt: "Press RETURN/ENTER to continue or any other key to abort:", action: "Enter キー を押す" },
       { prompt: "Password:", action: "Mac のログインパスワード を入力 (※打っても画面に何も出ませんが、それで正常)" },
-      { prompt: "Installation successful!", action: "完了。このアプリに戻ると自動で「✓ 完了」になります" },
+      { prompt: "Installation successful!", action: "完了。Claude Kit に戻ると自動で「✓ 完了」になります" },
+      { prompt: "Next steps:", action: "案内が出ますが、何もしなくてOKです。閉じてOK" },
     ],
   },
   { id: "node", name: "Node.js (LTS)", description: "JavaScript ツールを動かすエンジン。Codex/Gemini CLI に必要", icon: "🟢", category: "core", os: "all", recommended: true },
@@ -55,7 +56,9 @@ const TOOLS: Tool[] = [
       { prompt: "Would you like to see a more detailed list of what I will do during this installation?", action: "n と入力 → Enter" },
       { prompt: "Ready to continue?", action: "y と入力 → Enter" },
       { prompt: "Password:", action: "Mac のログインパスワード を入力 (※何も表示されないが正常)" },
-      { prompt: "Nix is now installed", action: "完了。新しいターミナルで `nix` コマンドが使えます" },
+      { prompt: "Alright! We're done!", action: "✅ ここで完了。あとは Enter を何度か押すだけ" },
+      { prompt: "Press enter/return to acknowledge.", action: "Enter キーを押す (※何回か出るので、出るたびに Enter)" },
+      { prompt: "(プロンプトに戻ったら)", action: "新しいターミナル窓を開けば `nix` が使えます。Claude Kit はそのままでOK" },
     ],
   },
 ];
@@ -73,6 +76,9 @@ const CATEGORY_LEAD: Record<ToolCategory, string> = {
   ai: "AI に手伝ってもらうための仲間たち",
   extras: "興味があれば。なくてもOK",
 };
+
+// Nix が選ばれていれば、これらは Nix で代替可能になる
+const NIX_REPLACES = new Set(["homebrew", "node", "git", "gh"]);
 
 type Status = "queued" | "installing" | "done" | "error";
 
@@ -174,17 +180,24 @@ function renderToolPicker() {
     const cards = items.map((t) => {
       const s = getState(t.id);
       const checked = s.selected ? "checked" : "";
-      const cls = s.detected ? "tool-card detected" : "tool-card";
+      const isReplaceableByNix = NIX_REPLACES.has(t.id) && getState("nix").selected;
+      const classes = ["tool-card"];
+      if (s.detected) classes.push("detected");
+      if (isReplaceableByNix) classes.push("alt-by-nix");
       const uninstallBtn = s.detected
         ? `<button class="tool-uninstall-btn" type="button" data-id="${t.id}" title="このツールを削除します">🗑 削除</button>`
         : "";
+      const altNote = isReplaceableByNix
+        ? `<div class="tool-alt-note">✦ Nix を選んだので、これは不要にできます</div>`
+        : "";
       return `
-        <label class="${cls}" data-id="${t.id}">
+        <label class="${classes.join(" ")}" data-id="${t.id}">
           <input type="checkbox" data-id="${t.id}" ${checked} />
           <div class="tool-icon">${t.icon}</div>
           <div class="tool-meta">
             <div class="tool-name">${escapeHtml(t.name)}</div>
             <div class="tool-desc">${escapeHtml(t.description)}</div>
+            ${altNote}
           </div>
           <div class="tool-status">${badgeHtml(s.status, s.detected)}</div>
           ${uninstallBtn}
@@ -212,9 +225,14 @@ function bindPickerEvents() {
       const id = el.dataset.id;
       if (!id) return;
       setState(id, { selected: el.checked });
-      const card = el.closest(".tool-card");
-      card?.classList.toggle("selected", el.checked);
-      updateSelectSummary();
+      if (id === "nix") {
+        // Nix の選択状態で他カードの「Nix で代替可」ヒントが変わるので再描画
+        renderToolPicker();
+      } else {
+        const card = el.closest(".tool-card");
+        card?.classList.toggle("selected", el.checked);
+        updateSelectSummary();
+      }
     });
     const id = el.dataset.id;
     if (id) {
