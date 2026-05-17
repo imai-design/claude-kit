@@ -5,7 +5,6 @@ Claude を使い始めるのに必要な道具を、ボタン一つでまとめ�
 対象ツール:
 - 🌿 Git
 - 📝 Visual Studio Code
-- 🤖 Claude (デスクトップアプリ)
 - ⌨️ Claude Code (ターミナル版)
 
 対象OS: macOS / Windows 10+
@@ -131,7 +130,6 @@ bun run tauri build
 |---|---|---|
 | Git | `which git` + 既知パス | `where git.exe` + Program Files |
 | VS Code | `/Applications/Visual Studio Code.app` | `LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe` |
-| Claude Desktop | `/Applications/Claude.app` | `LOCALAPPDATA\AnthropicClaude\Claude.exe` |
 | Claude Code | `which claude` + 既知パス | `where claude.cmd/exe` |
 
 ### インストール (`install_tool`)
@@ -140,7 +138,6 @@ bun run tauri build
 |---|---|---|
 | Git | `xcode-select --install` (OSダイアログ) | `winget install Git.Git` |
 | VS Code | 公式zip DL → `/Applications/` 展開 | `winget install Microsoft.VisualStudioCode` |
-| Claude Desktop | 公式dmg DL → mount → cp | `winget install Anthropic.Claude` |
 | Claude Code | `curl -fsSL claude.ai/install.sh \| bash` | `irm claude.ai/install.ps1 \| iex` |
 
 進捗は Rust → フロント の `install:progress` Tauri event で配信。

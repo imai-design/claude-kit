@@ -5,7 +5,6 @@ Claudeを使い始めるのに必要な道具を、**ボタン一つでまとめ
 対象:
 - 🌿 Git
 - 📝 Visual Studio Code
-- 🤖 Claude (デスクトップアプリ)
 - ⌨️ Claude Code (ターミナル版Claude)
 
 対応OS: macOS / Windows 10+
