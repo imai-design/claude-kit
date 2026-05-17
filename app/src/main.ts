@@ -135,7 +135,7 @@ function renderToolPicker() {
       const checked = s.selected ? "checked" : "";
       const cls = s.detected ? "tool-card detected" : "tool-card";
       const uninstallBtn = s.detected
-        ? `<button class="tool-uninstall-btn" type="button" data-id="${t.id}" title="アンインストール">🗑</button>`
+        ? `<button class="tool-uninstall-btn" type="button" data-id="${t.id}" title="このツールを削除します">🗑 削除</button>`
         : "";
       return `
         <label class="${cls}" data-id="${t.id}">
