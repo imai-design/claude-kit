@@ -593,6 +593,44 @@ code {
   .info-persona-warn { background: #3a2d15; color: #fbbf24; }
 }
 
+.info-cons {
+  background: var(--surface-2);
+  border-left: 3px solid #94a3b8;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+.info-cons-title {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.info-cons-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.info-cons-list li {
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.info-cons-list code {
+  font-size: 10px;
+  padding: 1px 5px;
+}
+.info-cons-note {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+
 .error-summary {
   align-self: stretch;
   text-align: left;
