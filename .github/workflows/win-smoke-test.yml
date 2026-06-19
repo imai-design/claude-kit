@@ -1,0 +1,66 @@
+name: Win Smoke Test
+
+# Claude Kit が Windows で使うインストール処理を、実際の windows runner で検証する。
+# 各ツールのインストールコマンド（winget / install.ps1 / npm）を実走し、where で導入を確認する。
+# 本番ビルド(release.yml)とは別の、手動/ブランチ限定のスモークテスト。
+
+on:
+  push:
+    branches: [test/win-smoke]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - name: winget の有無とバージョン
+        run: |
+          winget --version
+          winget source update
+        continue-on-error: true
+
+      - name: Git (winget Git.Git)
+        run: winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements --silent
+        continue-on-error: true
+
+      - name: VS Code (winget Microsoft.VisualStudioCode)
+        run: winget install --id Microsoft.VisualStudioCode -e --accept-source-agreements --accept-package-agreements --silent
+        continue-on-error: true
+
+      - name: Node.js LTS (winget OpenJS.NodeJS.LTS)
+        run: winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements --silent
+        continue-on-error: true
+
+      - name: GitHub CLI (winget GitHub.cli)
+        run: winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements --silent
+        continue-on-error: true
+
+      - name: Obsidian (winget Obsidian.Obsidian)
+        run: winget install --id Obsidian.Obsidian -e --accept-source-agreements --accept-package-agreements --silent
+        continue-on-error: true
+
+      - name: Claude Code (irm https://claude.ai/install.ps1 | iex)
+        run: irm https://claude.ai/install.ps1 | iex
+        shell: pwsh
+        continue-on-error: true
+
+      - name: npm 系 (codex / gemini)
+        run: |
+          npm install -g @openai/codex
+          npm install -g @google/gemini-cli
+        shell: pwsh
+        continue-on-error: true
+
+      - name: 検証（detect 相当：where で各ツールを確認）
+        run: |
+          $tools = @('git','code','node','npm','gh','claude','codex','gemini')
+          foreach ($t in $tools) {
+            $found = (Get-Command $t -ErrorAction SilentlyContinue)
+            if ($found) { Write-Host "OK   $t -> $($found.Source)" }
+            else        { Write-Host "MISS $t -> 見つからない" }
+          }
+          Write-Host "--- Obsidian/VSCode アプリ実体 ---"
+          if (Test-Path "$env:LOCALAPPDATA\Programs\Microsoft VS Code\Code.exe") { Write-Host "OK   VS Code (LOCALAPPDATA)" }
+          if (Test-Path "$env:LOCALAPPDATA\Obsidian\Obsidian.exe") { Write-Host "OK   Obsidian (LOCALAPPDATA)" }
+        shell: pwsh
+        continue-on-error: true
