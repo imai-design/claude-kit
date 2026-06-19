@@ -39,28 +39,7 @@ const TOOLS: Tool[] = [
       { prompt: "Next steps:", action: "案内が出ますが、何もしなくてOKです。閉じてOK" },
     ],
   },
-  { id: "node", name: "Node.js (LTS)", description: "JavaScript ツールを動かすエンジン。Codex/Gemini CLI に必要", icon: "🟢", category: "core", os: "all", recommended: true },
-  { id: "gh", name: "GitHub CLI", description: "Claude Code から GitHub を操作するため。1 回ログインすればOK", icon: "🐙", category: "core", os: "all", recommended: false },
-  { id: "codex", name: "Codex CLI", description: "OpenAI版のターミナル AI。Claude Code と切り替えて使える", icon: "🟣", category: "ai", os: "all", recommended: false },
-  { id: "gemini", name: "Gemini CLI", description: "Google版のターミナル AI。Claude Code から呼び出すこともできる", icon: "💎", category: "ai", os: "all", recommended: false },
-  { id: "obsidian", name: "Obsidian", description: "Markdown でメモを書き溜めるアプリ。Claude と連携できる", icon: "🗒️", category: "extras", os: "all", recommended: false },
-  {
-    id: "nix",
-    name: "Nix",
-    description: "プロジェクト単位で環境を完璧に固定できる上級者向けツール",
-    icon: "❄️",
-    category: "extras",
-    os: "mac",
-    recommended: false,
-    terminalSteps: [
-      { prompt: "Would you like to see a more detailed list of what I will do during this installation?", action: "n と入力 → Enter" },
-      { prompt: "Ready to continue?", action: "y と入力 → Enter" },
-      { prompt: "Password:", action: "Mac のログインパスワード を入力 (※何も表示されないが正常)" },
-      { prompt: "Alright! We're done!", action: "✅ ここで完了。あとは Enter を何度か押すだけ" },
-      { prompt: "Press enter/return to acknowledge.", action: "Enter キーを押す (※何回か出るので、出るたびに Enter)" },
-      { prompt: "(プロンプトに戻ったら)", action: "新しいターミナル窓を開けば `nix` が使えます。Claude Kit はそのままでOK" },
-    ],
-  },
+  { id: "obsidian", name: "Obsidian", description: "Markdown でメモを書き溜めるアプリ。Claude と連携できる", icon: "🗒️", category: "extras", os: "all", recommended: true },
 ];
 
 const CATEGORY_LABEL: Record<ToolCategory, string> = {
